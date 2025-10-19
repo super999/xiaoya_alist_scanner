@@ -17,8 +17,8 @@ python scan_webdav_new_episodes.py
 亦可在项目根目录创建 `.env` 文件管理敏感凭证（默认会自动加载，已有环境变量仍可覆盖）：
 
 ```
-WEBDAV_USER=super999
-WEBDAV_PASS=chenxiawen
+WEBDAV_USER=
+WEBDAV_PASS=
 ```
 
 默认会在仓库根目录生成 / 更新 `state.json`，用来记录已扫描过的剧集文件，避免重复通知。
