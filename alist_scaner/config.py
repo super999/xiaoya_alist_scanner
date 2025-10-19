@@ -47,6 +47,8 @@ class Config:
     skip_paths_file: str
     skip_paths: List[str]
     env_file: str
+    tmdb_api_key: str
+    metadata_cache_hours: int
     raw_environment: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -72,6 +74,8 @@ class Config:
             "WEBDAV_SCAN_CACHE_HOURS": "24",
             "WEBDAV_SKIP_PATHS_FILE": "./skip_paths.json",
             "WEBDAV_ENV_FILE": env_file,
+            "TMDB_API_KEY": "",
+            "METADATA_CACHE_HOURS": "168",
         }
 
         # 兼容旧脚本——缺省时直接把默认值写入环境变量，方便外部复用
@@ -100,6 +104,13 @@ class Config:
             )
         except ValueError as exc:
             raise ValueError("WEBDAV_SCAN_CACHE_HOURS 必须是整数小时") from exc
+
+        try:
+            metadata_cache_hours = int(
+                os.getenv("METADATA_CACHE_HOURS", defaults["METADATA_CACHE_HOURS"])
+            )
+        except ValueError as exc:
+            raise ValueError("METADATA_CACHE_HOURS 必须是整数小时") from exc
 
         skip_paths_file = os.getenv(
             "WEBDAV_SKIP_PATHS_FILE", defaults["WEBDAV_SKIP_PATHS_FILE"]
@@ -148,6 +159,8 @@ class Config:
             skip_paths_file=skip_paths_file,
             skip_paths=skip_paths,
             env_file=env_file,
+            tmdb_api_key=os.getenv("TMDB_API_KEY", defaults["TMDB_API_KEY"]),
+            metadata_cache_hours=metadata_cache_hours,
             raw_environment=env_snapshot,
         )
 
