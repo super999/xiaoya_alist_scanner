@@ -4,14 +4,19 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Iterable, Iterator, List, Optional, Tuple
 
 from .config import Config
 from .filters import EpisodeFilter
 from .models import Episode, WebDAVResource
 from .state import StateStore
+from .storage import SQLiteStore
 from .webdav import WebDAVClient
+
+
+ShowBatch = Tuple[str, Optional[str], List[Episode]]
 
 
 @dataclass
@@ -22,14 +27,102 @@ class EpisodeScanner:
     client: WebDAVClient
     state: StateStore
     filter: EpisodeFilter
+    storage: SQLiteStore
 
-    def scan(self) -> List[Episode]:
+    @property
+    def _cache_ttl_seconds(self) -> int:
+        hours = max(self.config.scan_cache_hours, 0)
+        return hours * 3600
+
+    def run(self) -> None:
         logging.info("开始扫描 WebDAV（小雅 Alist）...")
-        # WebDAV 遍历交给客户端，返回粗粒度的资源列表
-        resources = self.client.walk(self.config.roots)
-        return self._collect_episodes(resources)
 
-    def _collect_episodes(self, resources: Iterable[WebDAVResource]) -> List[Episode]:
+        state_cache = self.state.load()
+        first_run = not bool(state_cache)
+        if first_run and self.config.only_new:
+            logging.info("首次运行：为了避免把历史内容都当作新增，本次不输出新增清单。")
+        all_new: List[Episode] = []
+        all_episodes: List[Episode] = []
+
+        for cache_key, lastmod, episodes in self._iter_show_batches():
+            if not episodes:
+                self.storage.mark_directory_scanned(cache_key, lastmod)
+                continue
+
+            new_eps: List[Episode] = []
+            for episode in episodes:
+                is_new = self.state.detect_new(episode)
+                if is_new and not first_run:
+                    episode.is_new = True
+                    new_eps.append(episode)
+                self.state.mark_seen(episode)
+
+            self.state.save()
+            self.storage.upsert_episodes(episodes)
+            self.storage.mark_directory_scanned(cache_key, lastmod)
+
+            if self.config.only_new:
+                all_new.extend(new_eps)
+            else:
+                all_episodes.extend(episodes)
+
+            logging.debug(
+                "剧集目录 %s 扫描完成，新增 %s 条，全部 %s 条。",
+                episodes[0].show_path if episodes else cache_key,
+                len(new_eps),
+                len(episodes),
+            )
+
+        if self.config.only_new:
+            payload = [episode.to_dict(include_is_new=True) for episode in all_new]
+        else:
+            payload = [episode.to_dict(include_is_new=True) for episode in all_episodes]
+
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+        logging.info(
+            "扫描流程完成，输出 %s 条记录。",
+            len(payload),
+        )
+
+    def _iter_show_batches(self) -> Iterator[ShowBatch]:
+        """按照剧集目录逐个返回扫描结果。"""
+
+        for root in self.config.roots:
+            entries = self.client.list_directory(root, depth=1)
+            for entry in entries:
+                if entry.path.rstrip("/") == root.rstrip("/"):
+                    continue
+
+                if entry.is_dir:
+                    if self._should_skip_directory(entry):
+                        logging.debug("命中缓存，跳过目录：%s", entry.path)
+                        continue
+
+                    resources = self.client.walk([entry.path])
+                    episodes = self._collect_episodes(resources, show_path=entry.path)
+                    yield (entry.path, entry.lastmod, episodes)
+                else:
+                    if self._should_skip_directory(entry):
+                        logging.debug("命中缓存，跳过文件：%s", entry.path)
+                        continue
+                    # 根目录下直接存在的文件，视为 show_path 的父目录
+                    parent_path = os.path.dirname(entry.path) or "/"
+                    episodes = self._collect_episodes([entry], show_path=parent_path)
+                    yield (entry.path, entry.lastmod, episodes)
+
+    def _should_skip_directory(self, resource: WebDAVResource) -> bool:
+        return self.storage.should_skip_scan(
+            path=resource.path,
+            remote_lastmod=resource.lastmod,
+            cache_ttl_seconds=self._cache_ttl_seconds,
+        )
+
+    def _collect_episodes(
+        self,
+        resources: Iterable[WebDAVResource],
+        show_path: Optional[str] = None,
+    ) -> List[Episode]:
         episodes: List[Episode] = []
         for item in resources:
             if item.is_dir:
@@ -40,10 +133,11 @@ class EpisodeScanner:
             lang = self.filter.detect_lang(item.path) or self.filter.detect_lang(filename)
             if lang not in ("美剧", "日剧"):
                 continue
-            # 统一组装为 Episode 模型，便于后续序列化与状态管理
+            resolved_show_path = show_path or os.path.dirname(item.path) or "/"
             episodes.append(
                 Episode(
                     path=item.path,
+                    show_path=resolved_show_path,
                     lang=lang,
                     filename=filename,
                     size=item.size,
@@ -52,39 +146,3 @@ class EpisodeScanner:
                 )
             )
         return episodes
-
-    def detect_new(self, episodes: Iterable[Episode]) -> List[Episode]:
-        # 仅返回新增的剧集文件列表
-        results: List[Episode] = []
-        state_data = self.state.load()
-        if not state_data:
-            logging.info("首次运行：为了避免把历史内容都当作新增，本次不输出新增清单。")
-            return []
-        for episode in episodes:
-            is_new = self.state.detect_new(episode)
-            if is_new:
-                episode.is_new = True
-                results.append(episode)
-        return results
-
-    def update_state(self, episodes: Iterable[Episode]) -> None:
-        episodes_list = list(episodes)
-        for episode in episodes_list:
-            self.state.mark_seen(episode)
-        self.state.save()
-        logging.info(
-            "扫描完成，共匹配 %s 个文件。状态已保存到 %s。",
-            len(episodes_list),
-            self.config.state_file,
-        )
-
-    def run(self) -> None:
-        episodes = self.scan()
-        if self.config.only_new:
-            new_items = self.detect_new(episodes)
-            payload = [episode.to_dict() for episode in new_items]
-            print(json.dumps(payload, ensure_ascii=False, indent=2))
-        else:
-            payload = [episode.to_dict() for episode in episodes]
-            print(json.dumps(payload, ensure_ascii=False, indent=2))
-        self.update_state(episodes)

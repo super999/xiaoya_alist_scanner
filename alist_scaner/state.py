@@ -46,6 +46,7 @@ class StateStore:
             "lastmod": episode.lastmod,
             "lang": episode.lang,
             "filename": episode.filename,
+            "show_path": episode.show_path,
             "ts_seen": int(time.time()),
         }
 

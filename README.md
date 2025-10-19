@@ -24,6 +24,7 @@ python scan_webdav_new_episodes.py
 	- `webdav.py`：WebDAV 客户端封装，包含容错的 PROPFIND 调用。
 	- `filters.py`：视频后缀和语言规则的筛选器。
 	- `state.py`：状态持久化，使用原子写避免文件损坏。
+	- `storage.py`：SQLite 本地数据库，记录剧集及目录缓存信息。
 	- `scanner.py`：剧集扫描主流程，负责整合各模块。
 	- `cli.py`：命令行入口与依赖装配函数。
 
@@ -38,9 +39,17 @@ python scan_webdav_new_episodes.py
 | `WEBDAV_STATE_FILE` | 状态文件路径 | `./state.json` |
 | `WEBDAV_TIMEOUT` | 请求超时时间（秒） | `20` |
 | `WEBDAV_ONLY_NEW` | 是否仅输出“新增”文件 | `true` |
-| `LOG_LEVEL` | 日志级别 | `INFO` |
+| `WEBDAV_DB_FILE` | SQLite 数据库存储路径 | `./alist_scaner.db` |
+| `WEBDAV_SCAN_CACHE_HOURS` | 剧集目录缓存时长（小时），缓存内且未更新则跳过扫描 | `24` |
+| `LOG_LEVEL` | 日志级别 | `DEBUG` |
 
 > 所有默认值在运行时会自动写入环境变量，确保与旧脚本保持一致的体验。
+
+## 新增特性
+
+- **本地 SQLite 持久化**：每个剧集在扫描完成后立即落库，方便后续做统计或与其他服务联动。
+- **目录级缓存控制**：借助 `WEBDAV_SCAN_CACHE_HOURS` 与 WebDAV 中的最后修改时间，重复扫描会在缓存期内自动跳过，常见场景可大幅降低同目录的重复请求次数。
+- **增量扫描**：若目录上次扫描后的最后修改时间发生变化，会立即重新递归该目录，确保新增剧集不会因缓存而错过。
 
 ## 以包方式调用
 

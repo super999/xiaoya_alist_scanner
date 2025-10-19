@@ -9,6 +9,7 @@ from .filters import EpisodeFilter
 from .scanner import EpisodeScanner
 from .state import StateStore
 from .webdav import WebDAVClient
+from .storage import SQLiteStore
 
 
 def build_scanner() -> EpisodeScanner:
@@ -22,6 +23,7 @@ def build_scanner() -> EpisodeScanner:
         timeout=config.timeout,
     )
     state = StateStore(config.state_file)
+    storage = SQLiteStore(config.database_file)
     episode_filter = EpisodeFilter(config.video_exts, config.lang_rules)
 
     # 维持同旧脚本的日志格式
@@ -32,6 +34,7 @@ def build_scanner() -> EpisodeScanner:
         client=client,
         state=state,
         filter=episode_filter,
+        storage=storage,
     )
 
 

@@ -27,10 +27,12 @@ class Config:
     verify_ssl: bool
     video_exts: List[str]
     lang_rules: Dict[str, List[str]]
-    only_new: bool
+    only_new: bool  # 是否仅处理新增文件
     state_file: str
     timeout: int
     log_level: str
+    database_file: str
+    scan_cache_hours: int
     raw_environment: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -49,6 +51,8 @@ class Config:
             "LOG_LEVEL": "DEBUG",
             "WEBDAV_TIMEOUT": "20",
             "WEBDAV_ONLY_NEW": "true",
+            "WEBDAV_DB_FILE": "./alist_scaner.db",
+            "WEBDAV_SCAN_CACHE_HOURS": "24",
         }
 
         # 兼容旧脚本——缺省时直接把默认值写入环境变量，方便外部复用
@@ -71,6 +75,12 @@ class Config:
             timeout = int(os.getenv("WEBDAV_TIMEOUT", defaults["WEBDAV_TIMEOUT"]))
         except ValueError as exc:
             raise ValueError("WEBDAV_TIMEOUT 必须是整数秒数") from exc
+        try:
+            scan_cache_hours = int(
+                os.getenv("WEBDAV_SCAN_CACHE_HOURS", defaults["WEBDAV_SCAN_CACHE_HOURS"])
+            )
+        except ValueError as exc:
+            raise ValueError("WEBDAV_SCAN_CACHE_HOURS 必须是整数小时") from exc
 
         config = cls(
             webdav_base=os.getenv("WEBDAV_BASE", defaults["WEBDAV_BASE"]),
@@ -100,6 +110,8 @@ class Config:
             state_file=os.getenv("WEBDAV_STATE_FILE", defaults["WEBDAV_STATE_FILE"]),
             timeout=timeout,
             log_level=os.getenv("LOG_LEVEL", defaults["LOG_LEVEL"]),
+            database_file=os.getenv("WEBDAV_DB_FILE", defaults["WEBDAV_DB_FILE"]),
+            scan_cache_hours=scan_cache_hours,
             raw_environment=env_snapshot,
         )
 

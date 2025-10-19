@@ -22,6 +22,7 @@ class Episode:
     """匹配到的剧集文件。"""
 
     path: str
+    show_path: str
     lang: str
     filename: str
     size: int
@@ -34,6 +35,7 @@ class Episode:
 
         data = {
             "path": self.path,
+            "show_path": self.show_path,
             "lang": self.lang,
             "filename": self.filename,
             "size": self.size,

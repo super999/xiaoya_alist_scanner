@@ -79,7 +79,7 @@ class WebDAVClient:
 
     def list_directory(self, path: str, depth: int = 1) -> List[WebDAVResource]:
         url = self.join_url(path)
-        logging.debug("PROPFIND %s", urllib.parse.unquote(url))
+        logging.info("PROPFIND %s", urllib.parse.unquote(url))
         response = self.propfind_smart(url, depth=depth)
         return self._parse_propfind_xml(response.text)
 
@@ -94,8 +94,8 @@ class WebDAVClient:
             try:
                 entries = self.list_directory(current, depth=1)
                 # print(entries)
-                for entry in entries:
-                    logging.debug("walk -> list_directory -> Found: %s (is_dir=%s)", entry.path, entry.is_dir)
+                # for entry in entries:
+                #     logging.debug("walk -> list_directory -> Found: %s (is_dir=%s)", entry.path, entry.is_dir)
             except Exception as exc:  # noqa: BLE001
                 logging.warning("PROPFIND 失败：%s -> %s", urllib.parse.unquote(current), exc)
                 continue
