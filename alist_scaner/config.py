@@ -75,7 +75,7 @@ class Config:
             "WEBDAV_SKIP_PATHS_FILE": "./skip_paths.json",
             "WEBDAV_ENV_FILE": env_file,
             "TMDB_API_KEY": "",
-            "METADATA_CACHE_HOURS": "168",
+            "METADATA_CACHE_HOURS": "0",
         }
 
         # 兼容旧脚本——缺省时直接把默认值写入环境变量，方便外部复用

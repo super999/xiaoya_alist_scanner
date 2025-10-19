@@ -50,6 +50,7 @@ WEBDAV_PASS=
 | `WEBDAV_SCAN_CACHE_HOURS` | 剧集目录缓存时长（小时），缓存内且未更新则跳过扫描 | `24` |
 | `WEBDAV_SKIP_PATHS_FILE` | 存放需跳过目录列表的 JSON 文件路径 | `./skip_paths.json` |
 | `WEBDAV_ENV_FILE` | 自定义 `.env` 文件路径 | `.env` |
+| `METADATA_CACHE_HOURS` | 元数据缓存时间（小时），设为 `0` 表示抓取成功后不再自动刷新 | `0` |
 | `LOG_LEVEL` | 日志级别 | `DEBUG` |
 
 > 所有默认值在运行时会自动写入环境变量，确保与旧脚本保持一致的体验。

@@ -88,8 +88,8 @@ class MetadataUpdater:
         if needs_refresh:
             return True
 
-        if self._cache_ttl <= 0:
-            return False
+        # if self._cache_ttl <= 0:
+        #     return False
 
         age = int(time.time()) - cached.updated_at
         return age >= self._cache_ttl
