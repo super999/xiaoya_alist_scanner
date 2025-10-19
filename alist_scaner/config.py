@@ -46,7 +46,7 @@ class Config:
             "WEBDAV_ROOTS": '["/每日更新/电视剧/日剧", "/每日更新/电视剧/美剧"]',
             "WEBDAV_VERIFY_SSL": "false",
             "WEBDAV_STATE_FILE": "./state.json",
-            "LOG_LEVEL": "INFO",
+            "LOG_LEVEL": "DEBUG",
             "WEBDAV_TIMEOUT": "20",
             "WEBDAV_ONLY_NEW": "true",
         }
