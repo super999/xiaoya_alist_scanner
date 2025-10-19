@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import List, Optional
 
 
 @dataclass
@@ -46,3 +46,17 @@ class Episode:
             # 仅在需要时附加 is_new 字段，保持对外兼容
             data["is_new"] = self.is_new
         return data
+
+
+@dataclass
+class ShowMetadata:
+    """剧集在第三方元数据服务中的补充信息。"""
+
+    show_path: str
+    title: str
+    lang: str
+    rating: Optional[float] = None
+    overview: Optional[str] = None
+    genres: List[str] = field(default_factory=list)
+    source: str = ""
+    updated_at: int = 0

@@ -5,6 +5,7 @@ from .scanner import EpisodeScanner
 from .state import StateStore
 from .webdav import WebDAVClient
 from .storage import SQLiteStore
+from .metadata import ShowMetadataFetcher
 
 __all__ = [
     "Config",
@@ -12,4 +13,5 @@ __all__ = [
     "StateStore",
     "WebDAVClient",
     "SQLiteStore",
+    "ShowMetadataFetcher",
 ]

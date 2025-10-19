@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Iterator, Optional, Tuple
 
-from .models import Episode
+from .models import Episode, ShowMetadata
 
 
 @dataclass
@@ -46,9 +47,48 @@ class SQLiteStore:
                 etag TEXT,
                 updated_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS show_metadata (
+                show_path TEXT PRIMARY KEY,
+                title TEXT,
+                lang TEXT,
+                rating REAL,
+                overview TEXT,
+                genres TEXT,
+                source TEXT,
+                updated_at INTEGER NOT NULL
+            );
             """
         )
         self._conn.commit()
+
+    def get_show_metadata(self, show_path: str) -> Optional[ShowMetadata]:
+        cursor = self._conn.execute(
+            "SELECT show_path, title, lang, rating, overview, genres, source, updated_at"
+            " FROM show_metadata WHERE show_path = ?",
+            (show_path,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        genres: list[str] = []
+        if row["genres"]:
+            try:
+                genres = json.loads(row["genres"])
+                if not isinstance(genres, list):
+                    genres = []
+            except json.JSONDecodeError:
+                genres = []
+        return ShowMetadata(
+            show_path=row["show_path"],
+            title=row["title"] or "",
+            lang=row["lang"] or "",
+            rating=row["rating"],
+            overview=row["overview"],
+            genres=genres,
+            source=row["source"] or "",
+            updated_at=row["updated_at"],
+        )
 
     def should_skip_scan(
         self,
@@ -131,6 +171,55 @@ class SQLiteStore:
             rows,
         )
         self._conn.commit()
+
+    def upsert_show_metadata(self, metadata: ShowMetadata) -> None:
+        now_ts = int(time.time())
+        genres = json.dumps(metadata.genres, ensure_ascii=False) if metadata.genres else "[]"
+        self._conn.execute(
+            """
+            INSERT INTO show_metadata(show_path, title, lang, rating, overview, genres, source, updated_at)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(show_path) DO UPDATE SET
+                title = excluded.title,
+                lang = excluded.lang,
+                rating = excluded.rating,
+                overview = excluded.overview,
+                genres = excluded.genres,
+                source = excluded.source,
+                updated_at = excluded.updated_at
+            """,
+            (
+                metadata.show_path,
+                metadata.title,
+                metadata.lang,
+                metadata.rating,
+                metadata.overview,
+                genres,
+                metadata.source,
+                now_ts,
+            ),
+        )
+        self._conn.commit()
+
+    def iter_show_entries(self) -> Iterator[Tuple[str, str]]:
+        """返回数据库中已记录的剧集路径及其语言。"""
+
+        cursor = self._conn.execute(
+            """
+            SELECT e.show_path, COALESCE(e.lang, '') AS lang
+            FROM episodes e
+            INNER JOIN (
+                SELECT show_path, MAX(updated_at) AS updated_at
+                FROM episodes
+                GROUP BY show_path
+            ) latest
+            ON e.show_path = latest.show_path AND e.updated_at = latest.updated_at
+            GROUP BY e.show_path
+            ORDER BY e.show_path
+            """
+        )
+        for row in cursor:
+            yield (row["show_path"], row["lang"])
 
     def close(self) -> None:
         self._conn.close()
