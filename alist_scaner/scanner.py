@@ -19,6 +19,17 @@ from .webdav import WebDAVClient
 ShowBatch = Tuple[str, Optional[str], List[Episode]]
 
 
+def _normalize_path(path: str) -> str:
+    if not path:
+        return ""
+    path = path.strip()
+    if not path.startswith("/"):
+        path = f"/{path}"
+    if len(path) > 1:
+        path = path.rstrip("/")
+    return path or "/"
+
+
 @dataclass
 class EpisodeScanner:
     """负责 orchestrate WebDAV 扫描流程。"""
@@ -89,9 +100,16 @@ class EpisodeScanner:
         """按照剧集目录逐个返回扫描结果。"""
 
         for root in self.config.roots:
+            if self._is_path_skipped(root):
+                logging.info("配置跳过根目录：%s", root)
+                continue
             entries = self.client.list_directory(root, depth=1)
             for entry in entries:
                 if entry.path.rstrip("/") == root.rstrip("/"):
+                    continue
+
+                if self._is_path_skipped(entry.path):
+                    logging.debug("配置跳过路径：%s", entry.path)
                     continue
 
                 if entry.is_dir:
@@ -118,6 +136,17 @@ class EpisodeScanner:
             cache_ttl_seconds=self._cache_ttl_seconds,
         )
 
+    def _is_path_skipped(self, path: str) -> bool:
+        normalized = _normalize_path(path)
+        if not normalized:
+            return False
+        for skip in self.config.skip_paths:
+            if normalized == skip:
+                return True
+            if normalized.startswith(f"{skip}/"):
+                return True
+        return False
+
     def _collect_episodes(
         self,
         resources: Iterable[WebDAVResource],
@@ -126,6 +155,9 @@ class EpisodeScanner:
         episodes: List[Episode] = []
         for item in resources:
             if item.is_dir:
+                continue
+            if self._is_path_skipped(item.path):
+                logging.debug("配置跳过文件：%s", item.path)
                 continue
             filename = item.path.split("/")[-1]
             if not self.filter.is_video(filename):

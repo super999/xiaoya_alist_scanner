@@ -9,6 +9,17 @@ from dataclasses import dataclass, field
 from typing import Dict, List
 
 
+def _normalize_path(path: str) -> str:
+    path = path.strip()
+    if not path:
+        return ""
+    if not path.startswith("/"):
+        path = f"/{path}"
+    if len(path) > 1:
+        path = path.rstrip("/")
+    return path
+
+
 def _env_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -33,6 +44,8 @@ class Config:
     log_level: str
     database_file: str
     scan_cache_hours: int
+    skip_paths_file: str
+    skip_paths: List[str]
     raw_environment: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
@@ -53,6 +66,7 @@ class Config:
             "WEBDAV_ONLY_NEW": "true",
             "WEBDAV_DB_FILE": "./alist_scaner.db",
             "WEBDAV_SCAN_CACHE_HOURS": "24",
+            "WEBDAV_SKIP_PATHS_FILE": "./skip_paths.json",
         }
 
         # 兼容旧脚本——缺省时直接把默认值写入环境变量，方便外部复用
@@ -81,6 +95,20 @@ class Config:
             )
         except ValueError as exc:
             raise ValueError("WEBDAV_SCAN_CACHE_HOURS 必须是整数小时") from exc
+
+        skip_paths_file = os.getenv(
+            "WEBDAV_SKIP_PATHS_FILE", defaults["WEBDAV_SKIP_PATHS_FILE"]
+        )
+        skip_paths: List[str] = []
+        if skip_paths_file:
+            try:
+                skip_paths = cls._load_skip_paths(skip_paths_file)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"跳过目录配置文件 {skip_paths_file} 不是合法的 JSON 列表"
+                ) from exc
+            except OSError as exc:
+                raise OSError(f"无法读取跳过目录配置文件 {skip_paths_file}: {exc}") from exc
 
         config = cls(
             webdav_base=os.getenv("WEBDAV_BASE", defaults["WEBDAV_BASE"]),
@@ -112,6 +140,8 @@ class Config:
             log_level=os.getenv("LOG_LEVEL", defaults["LOG_LEVEL"]),
             database_file=os.getenv("WEBDAV_DB_FILE", defaults["WEBDAV_DB_FILE"]),
             scan_cache_hours=scan_cache_hours,
+            skip_paths_file=skip_paths_file,
+            skip_paths=skip_paths,
             raw_environment=env_snapshot,
         )
 
@@ -122,3 +152,19 @@ class Config:
         )
 
         return config
+
+    @staticmethod
+    def _load_skip_paths(file_path: str) -> List[str]:
+        if not os.path.exists(file_path):
+            return []
+        with open(file_path, "r", encoding="utf-8") as fp:
+            data = json.load(fp)
+        if not isinstance(data, list) or not all(isinstance(item, str) for item in data):
+            raise ValueError("跳过目录配置文件需要是字符串列表 JSON，例如 ['路径1', '路径2']")
+        normalized: List[str] = []
+        for item in data:
+            normalized_path = _normalize_path(item)
+            if not normalized_path:
+                continue
+            normalized.append(normalized_path)
+        return normalized

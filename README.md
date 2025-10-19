@@ -41,6 +41,7 @@ python scan_webdav_new_episodes.py
 | `WEBDAV_ONLY_NEW` | 是否仅输出“新增”文件 | `true` |
 | `WEBDAV_DB_FILE` | SQLite 数据库存储路径 | `./alist_scaner.db` |
 | `WEBDAV_SCAN_CACHE_HOURS` | 剧集目录缓存时长（小时），缓存内且未更新则跳过扫描 | `24` |
+| `WEBDAV_SKIP_PATHS_FILE` | 存放需跳过目录列表的 JSON 文件路径 | `./skip_paths.json` |
 | `LOG_LEVEL` | 日志级别 | `DEBUG` |
 
 > 所有默认值在运行时会自动写入环境变量，确保与旧脚本保持一致的体验。
@@ -50,6 +51,19 @@ python scan_webdav_new_episodes.py
 - **本地 SQLite 持久化**：每个剧集在扫描完成后立即落库，方便后续做统计或与其他服务联动。
 - **目录级缓存控制**：借助 `WEBDAV_SCAN_CACHE_HOURS` 与 WebDAV 中的最后修改时间，重复扫描会在缓存期内自动跳过，常见场景可大幅降低同目录的重复请求次数。
 - **增量扫描**：若目录上次扫描后的最后修改时间发生变化，会立即重新递归该目录，确保新增剧集不会因缓存而错过。
+
+## 跳过特定目录
+
+若希望永久跳过某些 WebDAV 目录（例如 `/每日更新/电视剧/日剧/【已完结】`），可以创建 `skip_paths.json` 文件，内容需是字符串数组：
+
+```json
+[
+	"/每日更新/电视剧/日剧/【已完结】",
+	"/每日更新/电视剧/日剧/测试目录"
+]
+```
+
+将文件路径写入环境变量 `WEBDAV_SKIP_PATHS_FILE`（默认即为 `./skip_paths.json`）后，扫描器会在遍历时忽略列表中的目录及其子项。
 
 ## 以包方式调用
 
