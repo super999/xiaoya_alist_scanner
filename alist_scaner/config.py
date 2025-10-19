@@ -46,18 +46,22 @@ class Config:
     scan_cache_hours: int
     skip_paths_file: str
     skip_paths: List[str]
+    env_file: str
     raw_environment: Dict[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls) -> "Config":
         """根据环境变量读取配置。"""
 
+        env_file = os.getenv("WEBDAV_ENV_FILE", ".env")
+        cls._load_dotenv(env_file)
+
         # 默认值同旧脚本保持一致
         # 这些默认值直接复用旧脚本里硬编码的值，便于保持行为一致
         defaults = {
             "WEBDAV_BASE": "http://192.168.9.1:5344/dav",
-            "WEBDAV_USER": "super999",
-            "WEBDAV_PASS": "chenxiawen",
+            "WEBDAV_USER": "",
+            "WEBDAV_PASS": "",
             "WEBDAV_ROOTS": '["/每日更新/电视剧/日剧", "/每日更新/电视剧/美剧"]',
             "WEBDAV_VERIFY_SSL": "false",
             "WEBDAV_STATE_FILE": "./state.json",
@@ -67,6 +71,7 @@ class Config:
             "WEBDAV_DB_FILE": "./alist_scaner.db",
             "WEBDAV_SCAN_CACHE_HOURS": "24",
             "WEBDAV_SKIP_PATHS_FILE": "./skip_paths.json",
+            "WEBDAV_ENV_FILE": env_file,
         }
 
         # 兼容旧脚本——缺省时直接把默认值写入环境变量，方便外部复用
@@ -142,6 +147,7 @@ class Config:
             scan_cache_hours=scan_cache_hours,
             skip_paths_file=skip_paths_file,
             skip_paths=skip_paths,
+            env_file=env_file,
             raw_environment=env_snapshot,
         )
 
@@ -168,3 +174,26 @@ class Config:
                 continue
             normalized.append(normalized_path)
         return normalized
+
+    @staticmethod
+    def _load_dotenv(file_path: str) -> None:
+        if not file_path or not os.path.exists(file_path):
+            return
+        try:
+            with open(file_path, "r", encoding="utf-8") as fp:
+                for line in fp:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        continue
+                    if "=" not in stripped:
+                        continue
+                    key, value = stripped.split("=", 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if not key:
+                        continue
+                    # 若环境变量已存在，优先保留外部传入的值
+                    os.environ.setdefault(key, value)
+        except OSError:
+            # 静默忽略读取失败，后续会沿用默认值
+            return

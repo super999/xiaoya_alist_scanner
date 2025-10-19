@@ -7,11 +7,18 @@
 ```powershell
 # Windows PowerShell 示例
 $env:WEBDAV_BASE = "http://192.168.9.1:5344/dav"
-$env:WEBDAV_USER = "super999"
-$env:WEBDAV_PASS = "chenxiawen"
+$env:WEBDAV_USER = ""
+$env:WEBDAV_PASS = ""
 $env:WEBDAV_ROOTS = '["/每日更新/电视剧/日剧", "/每日更新/电视剧/美剧"]'
 
 python scan_webdav_new_episodes.py
+```
+
+亦可在项目根目录创建 `.env` 文件管理敏感凭证（默认会自动加载，已有环境变量仍可覆盖）：
+
+```
+WEBDAV_USER=super999
+WEBDAV_PASS=chenxiawen
 ```
 
 默认会在仓库根目录生成 / 更新 `state.json`，用来记录已扫描过的剧集文件，避免重复通知。
@@ -33,7 +40,7 @@ python scan_webdav_new_episodes.py
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `WEBDAV_BASE` | WebDAV 基地址（无尾斜杠） | `http://192.168.9.1:5344/dav` |
-| `WEBDAV_USER` / `WEBDAV_PASS` | 访问凭证 | `super999` / `chenxiawen` |
+| `WEBDAV_USER` / `WEBDAV_PASS` | 访问凭证 | `aaa` / `bbb` |
 | `WEBDAV_ROOTS` | 需要扫描的根目录（JSON 列表字符串） | `['/每日更新/电视剧/日剧', '/每日更新/电视剧/美剧']` |
 | `WEBDAV_VERIFY_SSL` | 是否校验证书 | `false` |
 | `WEBDAV_STATE_FILE` | 状态文件路径 | `./state.json` |
@@ -42,6 +49,7 @@ python scan_webdav_new_episodes.py
 | `WEBDAV_DB_FILE` | SQLite 数据库存储路径 | `./alist_scaner.db` |
 | `WEBDAV_SCAN_CACHE_HOURS` | 剧集目录缓存时长（小时），缓存内且未更新则跳过扫描 | `24` |
 | `WEBDAV_SKIP_PATHS_FILE` | 存放需跳过目录列表的 JSON 文件路径 | `./skip_paths.json` |
+| `WEBDAV_ENV_FILE` | 自定义 `.env` 文件路径 | `.env` |
 | `LOG_LEVEL` | 日志级别 | `DEBUG` |
 
 > 所有默认值在运行时会自动写入环境变量，确保与旧脚本保持一致的体验。
